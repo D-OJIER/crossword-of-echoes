@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Crossword of Echoes</title>
+<style>
+  /* Basic layout */
+  :root { --bg:#071021; --panel:#0f1720; --muted:#9fb4c9; --accent:#0ea5e9; --glass: rgba(255,255,255,0.04); }
+  html, body { height:100%; margin:0; padding:0; background: linear-gradient(180deg, #04050a 0%, var(--bg) 100%); color: #e6eef8; font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  .wrap { max-width:1180px; margin:28px auto; padding:20px; box-sizing:border-box; }
+  h1 { margin:0 0 14px 0; font-weight:700; letter-spacing:0.2px; font-size:20px; }
+  #container{ display:flex; gap:20px; align-items:flex-start; justify-content:space-between; }
+  #crosswordPane{ background:var(--panel); padding:18px; border-radius:12px; box-shadow: 0 6px 18px rgba(3,7,12,0.6); flex:1 1 0; min-width:220px; max-width:calc(100% - 380px); }
+  #cluesPane{ width:360px; background:transparent; padding:6px 8px; }
+  ul{ padding-left:18px; margin:8px 0; }
+
+  /* Crossword table */
+  table.crossword { border-collapse:collapse; background:transparent; display:block; margin:0 auto; }
+  .crossword td { width:34px; height:34px; border:1px solid rgba(255,255,255,0.06); position:relative; background:#07111a; }
+  /* responsive cell sizing using CSS variable --cell-size */
+  .crossword { --cell-size: 34px; }
+  .crossword td { width:var(--cell-size); height:var(--cell-size); border:1px solid rgba(255,255,255,0.08); position:relative; background:#07111a; }
+  .crossword td.no-border { background:transparent; border-color:transparent; }
+  .crossword td .tile { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:calc(var(--cell-size) * 0.46); line-height:1; font-weight:800; color:#0b1620; background:#ffffff; cursor:text; transition: background 180ms ease, transform 120ms ease; }
+  .crossword td .tile:focus-within { transform: translateY(-2px); box-shadow: 0 6px 14px rgba(2,6,10,0.35); }
+  .crossword td .tile input { width:100%; height:100%; border:0; background:transparent; text-align:center; font-size:calc(var(--cell-size) * 0.46); font-weight:800; color:inherit; text-transform:uppercase; outline:0; caret-color:var(--accent); }
+  .crossword td .label { position:absolute; left:6px; top:4px; font-size:calc(var(--cell-size) * 0.28); color:rgba(255,255,255,0.9); font-weight:800; z-index:3; pointer-events:none; text-shadow:0 1px 0 rgba(0,0,0,0.6); }
+
+  /* Wordle-style flip animation and colors */
+  .tile { transform-style:preserve-3d; perspective:700px; }
+  .flip { animation: flip 450ms ease-in-out forwards; }
+  @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0deg); } }
+  .correct { background: #6aaa64 !important; color: #fff !important; }
+  .wrong { background: #d9534f !important; color: #fff !important; }
+  .present { background: #c9b458 !important; color:#fff !important; }
+
+  /* Controls */
+  .controls { margin-top:14px; display:flex; gap:12px; align-items:center; }
+  .btn { padding:9px 14px; border-radius:8px; border:0; cursor:pointer; background:var(--accent); color:#032; font-weight:800; box-shadow:0 6px 12px rgba(14,165,233,0.08); transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease; }
+  .btn:active{ transform: translateY(1px) scale(0.998); }
+  .btn.secondary { background:transparent; color:#e6eef8; border:1px solid rgba(255,255,255,0.06); }
+  #tries { color:#9fb4c9; }
+
+  /* small screens */
+  @media(max-width:1100px){ #container{gap:14px;} }
+  @media(max-width:900px){ #container{flex-direction:column-reverse; } #cluesPane{width:100%; margin-bottom:6px;} #crosswordPane{max-width:100%;} }
+  /* ensure crossword pane shrinks on very small screens */
+  @media(max-width:420px){ .crossword td { border-width:1px; } .wrap{padding:12px;} h1{font-size:16px;} }
+/* book loader styles (converted from SCSS) */
+.book { --color: #fff; --duration: 6.8s; width: 32px; height: 12px; position: relative; margin: 60px auto 0; zoom: 1.5; }
+.book .inner { width: 32px; height: 12px; position: relative; transform-origin: 2px 2px; transform: rotateZ(-90deg); animation: book var(--duration) ease infinite; }
+.book .left, .book .right { width: 60px; height: 4px; top: 0; border-radius: 2px; background: var(--color); position: absolute; }
+.book .left::before, .book .right::before { content: ''; width: 48px; height: 4px; border-radius: 2px; background: inherit; position: absolute; top: -10px; left: 6px; }
+.book .left { right: 28px; transform-origin: 58px 2px; transform: rotateZ(90deg); animation: left var(--duration) ease infinite; }
+.book .right { left: 28px; transform-origin: 2px 2px; transform: rotateZ(-90deg); animation: right var(--duration) ease infinite; }
+.book .middle { width: 32px; height: 12px; border: 4px solid var(--color); border-top: 0; border-radius: 0 0 9px 9px; transform: translateY(2px); }
+.book ul { margin: 0; padding: 0; list-style: none; position: absolute; left: 50%; top: 0; }
+.book ul li { height: 4px; border-radius: 2px; transform-origin: 100% 2px; width: 48px; right: 0; top: -10px; position: absolute; background: var(--color); transform: rotateZ(0deg) translateX(-18px); animation-duration: var(--duration); animation-timing-function: ease; animation-iteration-count: infinite; }
+/* stagger page animation delays for 18 items */
+ .book ul li:nth-child(1){ animation-delay: 0s; }
+ .book ul li:nth-child(2){ animation-delay: 0.12s; }
+ .book ul li:nth-child(3){ animation-delay: 0.24s; }
+ .book ul li:nth-child(4){ animation-delay: 0.36s; }
+ .book ul li:nth-child(5){ animation-delay: 0.48s; }
+ .book ul li:nth-child(6){ animation-delay: 0.60s; }
+ .book ul li:nth-child(7){ animation-delay: 0.72s; }
+ .book ul li:nth-child(8){ animation-delay: 0.84s; }
+ .book ul li:nth-child(9){ animation-delay: 0.96s; }
+ .book ul li:nth-child(10){ animation-delay: 1.08s; }
+ .book ul li:nth-child(11){ animation-delay: 1.20s; }
+ .book ul li:nth-child(12){ animation-delay: 1.32s; }
+ .book ul li:nth-child(13){ animation-delay: 1.44s; }
+ .book ul li:nth-child(14){ animation-delay: 1.56s; }
+ .book ul li:nth-child(15){ animation-delay: 1.68s; }
+ .book ul li:nth-child(16){ animation-delay: 1.80s; }
+ .book ul li:nth-child(17){ animation-delay: 1.92s; }
+ .book ul li:nth-child(18){ animation-delay: 2.04s; }
+
+@keyframes page { 0%{ transform: rotateZ(0deg) translateX(-18px); } 25%{ transform: rotateZ(180deg) translateX(-18px); } 50%{ transform: rotateZ(180deg) translateX(-18px); } 75%{ transform: rotateZ(0deg) translateX(-18px); } 100%{ transform: rotateZ(0deg) translateX(-18px); } }
+
+@keyframes left { 4%{ transform: rotateZ(90deg); } 10%,40%{ transform: rotateZ(0deg); } 46%,54%{ transform: rotateZ(90deg); } 60%,90%{ transform: rotateZ(0deg); } 96%{ transform: rotateZ(90deg); } }
+
+@keyframes right { 4%{ transform: rotateZ(-90deg); } 10%,40%{ transform: rotateZ(0deg); } 46%,54%{ transform: rotateZ(-90deg); } 60%,90%{ transform: rotateZ(0deg); } 96%{ transform: rotateZ(-90deg); } }
+
+@keyframes book { 4%{ transform: rotateZ(-90deg); } 10%,40%{ transform: rotateZ(0deg); transform-origin: 2px 2px; } 40.01%,59.99%{ transform-origin: 30px 2px; } 46%,54%{ transform: rotateZ(90deg); } 60%,90%{ transform: rotateZ(0deg); transform-origin: 2px 2px; } 96%{ transform: rotateZ(-90deg); } }
+</style>
+</head>
+<body>
+<!-- splash screen shown on load for 3 seconds -->
+<div id="splash" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#071026 0%, #08121a 100%);z-index:9999;color:#e8f0f8;padding:18px;">
+  <div style="text-align:center; max-width:720px; padding:18px; display:flex; gap:18px; align-items:flex-start; justify-content:center; flex-direction:column;">
+    <div style="font-size:28px;font-weight:800;margin-bottom:6px;">Crossword of Echoes</div>
+    <div style="opacity:0.9;margin-bottom:8px; font-weight:600;">Assembling puzzle...</div>
+    <blockquote style="margin:0 auto;color:rgba(255,255,255,0.88);font-style:italic;line-height:1.45;font-size:15px;max-width:560px;border-left:3px solid rgba(255,255,255,0.06);padding-left:12px;border-radius:6px;padding-top:8px;padding-bottom:8px;background:rgba(255,255,255,0.01);">
+      Scattered in silence, the fragments lie,<br>
+      Runes of meaning the void would deny.<br>
+      Seek them in shadow, where echoes convene<br>
+      Only the finder shall know what they mean.
+    </blockquote>
+    
+    <div class="book" aria-hidden="true">
+      <div class="inner">
+        <div class="left"></div>
+        <div class="middle"></div>
+        <div class="right"></div>
+      </div>
+      <ul>
+        <li style="animation-name: page; animation-delay: 0s"></li>
+        <li style="animation-name: page; animation-delay: 0.12s"></li>
+        <li style="animation-name: page; animation-delay: 0.24s"></li>
+        <li style="animation-name: page; animation-delay: 0.36s"></li>
+        <li style="animation-name: page; animation-delay: 0.48s"></li>
+        <li style="animation-name: page; animation-delay: 0.60s"></li>
+        <li style="animation-name: page; animation-delay: 0.72s"></li>
+        <li style="animation-name: page; animation-delay: 0.84s"></li>
+        <li style="animation-name: page; animation-delay: 0.96s"></li>
+        <li style="animation-name: page; animation-delay: 1.08s"></li>
+        <li style="animation-name: page; animation-delay: 1.20s"></li>
+        <li style="animation-name: page; animation-delay: 1.32s"></li>
+        <li style="animation-name: page; animation-delay: 1.44s"></li>
+        <li style="animation-name: page; animation-delay: 1.56s"></li>
+        <li style="animation-name: page; animation-delay: 1.68s"></li>
+        <li style="animation-name: page; animation-delay: 1.80s"></li>
+        <li style="animation-name: page; animation-delay: 1.92s"></li>
+        <li style="animation-name: page; animation-delay: 2.04s"></li>
+      </ul>
+    </div>
+  </div>
+</div>
+<div class="wrap">
+  <h1>Crossword of Echoes</h1>
+  <div id="container">
+    <div id="crosswordPane">
+      <div id="crossword"></div>
+      <div style="margin-top:8px; display:flex; gap:12px; align-items:center;">
+        <div id="dir">direction: <span id="direction">across</span> (double-click intersections to toggle)</div>
+        <div id="tries">Tries left: <span id="triesCount">3</span></div>
+      </div>
+      <div class="controls">
+        <button id="checkBtn" class="btn">Check</button>
+        <button id="showBtn" class="btn secondary" disabled>Show Answers</button>
+        <button id="resetBtn" class="btn secondary">Reset</button>
+      </div>
+    </div>
+
+    <div id="cluesPane">
+      <h3>Across</h3>
+      <ul id="across"></ul>
+      <h3>Down</h3>
+      <ul id="down"></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------- Word pool & random 10 selection ----------
+// Full pool of supplied words with their poetic clues. Each load selects 10 at random.
+const POOL = [
+  {w: "OBLIVION", clue: "Where all echoes fade, and memory holds no claim."},
+  {w: "EPITAPH", clue: "Carved in stone, it speaks when the voice is gone."},
+  {w: "LABYRINTH", clue: "A path without end, where choice is both guide and curse."},
+  {w: "PARADOX", clue: "The truth that wears a mask, both yes and no entwined."},
+  {w: "ECLIPSE", clue: "When light is devoured, yet returns reborn."},
+  {w: "CHIMERA", clue: "A beast of many forms, yet none its own."},
+  {w: "OBSIDIAN", clue: "A blade of night, forged from fire’s tears."},
+  {w: "ORACLE", clue: "One who sees tomorrow wrapped in riddles."},
+  {w: "ETHEREAL", clue: "Of mist and shadow, real yet untouchable."},
+  {w: "RUNES", clue: "Marks of power, silent but eternal in speech."},
+  {w: "CRYPTIC", clue: "A message cloaked in secrecy, seen only by the keen."},
+  {w: "ETERNITY", clue: "Endless and unbroken, a river without shore."},
+  {w: "MIRAGE", clue: "A vision seen, yet never held; thirst’s cruel trick."},
+  {w: "ABYSS", clue: "A depth without end, where silence devours all sound."},
+  {w: "PHANTOM", clue: "Fleshless, it lingers—fear given form."},
+  {w: "REVENANT", clue: "One returned from death, restless and unbound."},
+  {w: "OBSCURE", clue: "Hidden from light, truth veiled in shadow."},
+  {w: "MYTHOS", clue: "The eternal tales of gods and men."},
+  {w: "SERAPH", clue: "A burning one, winged in divine flame."},
+  {w: "NEMESIS", clue: "The eternal foe, hand of fated balance."},
+  {w: "GRIMOIRE", clue: "A book of spells, pages breathing with forgotten tongues."},
+  {w: "CATACLYSM", clue: "A ruinous end, when the world itself trembles."},
+  {w: "SANCTUM", clue: "A chamber sacred, where silence guards secrets."},
+  {w: "OMEN", clue: "A sign of fate, foretelling what the wanderer cannot escape."}
+];
+
+function pickRandomN(pool, n){
+  var arr = pool.slice();
+  for(var i = arr.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr.slice(0, n);
+}
+
+// choose 10 random words from the pool for this puzzle
+var SELECTED = pickRandomN(POOL, 10);
+const WORDS = SELECTED.map(x => x.w);
+const CLUES = SELECTED.map(x => x.clue);
+
+// ---------- Crossword algorithm (adapted & fixed) ----------
+function CrosswordCell(letter){ this.char = letter; this.across = null; this.down = null; }
+function CrosswordCellNode(is_start_of_word, index){ this.is_start_of_word = is_start_of_word; this.index = index; }
+function WordElement(word, index){ this.word = word; this.index = index; }
+function Crossword(words_in, clues_in){
+  var GRID_ROWS = 16, GRID_COLS = 16;
+  var char_index = {};
+  var bad_words;
+
+  this.getSquareGrid = function(max_tries){
+    var best_grid = null, best_ratio = 0;
+    for(var i=0;i<max_tries;i++){
+      var a_grid = this.getGrid(1);
+      if(a_grid==null) continue;
+      var ratio = Math.min(a_grid.length,a_grid[0].length)/Math.max(a_grid.length,a_grid[0].length);
+      if(ratio>best_ratio){ best_grid=a_grid; best_ratio=ratio; }
+      if(best_ratio==1) break;
+    }
+    return best_grid;
+  }
+
+  this.getGrid = function(max_tries){
+    for(var tries=0; tries<max_tries; tries++){
+      clearGrid();
+      var start_dir = randomDirection();
+      var r = Math.floor(grid.length/2), c = Math.floor(grid[0].length/2);
+      var word_element = word_elements[0];
+      if(start_dir=="across") c -= Math.floor(word_element.word.length/2); else r -= Math.floor(word_element.word.length/2);
+      if(canPlaceWordAt(word_element.word, r, c, start_dir) !== false){ placeWordAt(word_element.word, word_element.index, r, c, start_dir); }
+      else { bad_words = [word_element]; return null; }
+
+      var groups = []; groups.push(word_elements.slice(1));
+      for(var g=0; g<groups.length; g++){
+        var word_has_been_added_to_grid = false;
+        for(var i=0;i<groups[g].length;i++){
+          var we = groups[g][i];
+          var best_position = findPositionForWord(we.word);
+          if(!best_position){ if(groups.length-1==g) groups.push([]); groups[g+1].push(we); }
+          else { placeWordAt(we.word, we.index, best_position.row, best_position.col, best_position.direction); word_has_been_added_to_grid = true; }
+        }
+        if(!word_has_been_added_to_grid) break;
+        if(word_has_been_added_to_grid) return minimizeGrid();
+      }
+    }
+    bad_words = groups[groups.length-1]; return null;
+  }
+
+  this.getBadWords = function(){ return bad_words; }
+
+  this.getLegend = function(grid){ var groups={"across":[],"down":[]}; var position=1;
+    for(var r=0;r<grid.length;r++) for(var c=0;c<grid[r].length;c++){
+      var cell = grid[r][c], increment=false;
+      if(cell){ for(var k in groups){ if(cell[k] && cell[k].is_start_of_word){ var index = cell[k].index; groups[k].push({position:position,index:index,clue:clues_in[index],word:words_in[index]}); increment=true; } } }
+      if(increment) position++;
+    }
+    return groups;
+  }
+
+  // helpers
+  var minimizeGrid = function(){
+    var r_min=GRID_ROWS-1, r_max=0, c_min=GRID_COLS-1, c_max=0;
+    for(var r=0;r<GRID_ROWS;r++) for(var c=0;c<GRID_COLS;c++){ if(grid[r][c]!=null){ if(r<r_min) r_min=r; if(r>r_max) r_max=r; if(c<c_min) c_min=c; if(c>c_max) c_max=c; } }
+    var rows = r_max - r_min + 1, cols = c_max - c_min + 1;
+    var new_grid = new Array(rows);
+    for(var r2=0;r2<rows;r2++){ new_grid[r2] = new Array(cols); }
+    for(var r=r_min, r2=0; r2<rows; r++, r2++) for(var c=c_min, c2=0; c2<cols; c++, c2++) new_grid[r2][c2] = grid[r][c];
+    return new_grid;
+  }
+
+  var addCellToGrid = function(word, index_of_word_in_input_list, index_of_char, r, c, direction){
+    var ch = word.charAt(index_of_char);
+    if(grid[r][c] == null){ grid[r][c] = new CrosswordCell(ch);
+      if(!char_index[ch]) char_index[ch] = [];
+      char_index[ch].push({row:r,col:c});
+    }
+    var is_start_of_word = (index_of_char==0);
+    grid[r][c][direction] = new CrosswordCellNode(is_start_of_word, index_of_word_in_input_list);
+  }
+
+  var placeWordAt = function(word, index_of_word_in_input_list, row, col, direction){
+    if(direction=="across"){ for(var c=col,i=0;c<col+word.length;c++,i++){ addCellToGrid(word,index_of_word_in_input_list,i,row,c,"across"); } }
+    else { for(var r=row,i=0;r<row+word.length;r++,i++){ addCellToGrid(word,index_of_word_in_input_list,i,r,col,"down"); } }
+  }
+
+  var canPlaceCharAt = function(ch, row, col){ if(grid[row][col]==null) return 0; if(grid[row][col].char == ch) return 1; return false; }
+
+  var canPlaceWordAt = function(word, row, col, direction){
+    if(row<0 || row>=grid.length || col<0 || col>=grid[row].length) return false;
+    if(direction=="across"){
+      if(col + word.length > grid[row].length) return false;
+      if(col-1>=0 && grid[row][col-1] != null) return false;
+      if(col+word.length < grid[row].length && grid[row][col+word.length] != null) return false;
+      for(var r=row-1,c=col,i=0; r>=0 && c<col+word.length; c++,i++){ var is_empty = grid[r][c]==null; var is_intersection = (grid[row][c]!=null && grid[row][c].char == word.charAt(i)); if(!(is_empty || is_intersection)) return false; }
+      for(var r=row+1,c=col,i=0; r<grid.length && c<col+word.length; c++,i++){ var is_empty = grid[r][c]==null; var is_intersection = (grid[row][c]!=null && grid[row][c].char == word.charAt(i)); if(!(is_empty || is_intersection)) return false; }
+      var intersections = 0; for(var c=col,i=0;c<col+word.length;c++,i++){ var result = canPlaceCharAt(word.charAt(i), row, c); if(result===false) return false; intersections += result; }
+    } else if(direction=="down"){
+      if(row + word.length > grid.length) return false;
+      if(row-1>=0 && grid[row-1][col] != null) return false;
+      if(row+word.length < grid.length && grid[row+word.length][col] != null) return false;
+      for(var c=col-1,r=row,i=0; c>=0 && r<row+word.length; r++,i++){ var is_empty = grid[r][c]==null; var is_intersection = (grid[r][col]!=null && grid[r][col].char == word.charAt(i)); if(!(is_empty || is_intersection)) return false; }
+      for(var c=col+1,r=row,i=0; c<grid[row].length && r<row+word.length; r++,i++){ var is_empty = grid[r][c]==null; var is_intersection = (grid[r][col]!=null && grid[r][col].char == word.charAt(i)); if(!(is_empty || is_intersection)) return false; }
+      var intersections = 0; for(var r=row,i=0;r<row+word.length;r++,i++){ var result = canPlaceCharAt(word.charAt(i), r, col); if(result===false) return false; intersections += result; }
+    } else throw "Invalid Direction";
+    return intersections;
+  }
+
+  var randomDirection = function(){ return Math.floor(Math.random()*2) ? "across" : "down"; }
+
+  var findPositionForWord = function(word){
+    var bests = [];
+    for(var i=0;i<word.length;i++){
+      var possible = char_index[word.charAt(i)]; if(!possible) continue;
+      for(var j=0;j<possible.length;j++){
+        var point = possible[j]; var r=point.row, c=point.col;
+        var intersections_across = canPlaceWordAt(word, r, c - i, "across");
+        var intersections_down = canPlaceWordAt(word, r - i, c, "down");
+        if(intersections_across !== false) bests.push({intersections:intersections_across,row:r,col:c-i,direction:"across"});
+        if(intersections_down !== false) bests.push({intersections:intersections_down,row:r-i,col:c,direction:"down"});
+      }
+    }
+    if(bests.length==0) return false;
+    var best = bests[Math.floor(Math.random()*bests.length)]; return best;
+  }
+
+  var clearGrid = function(){ for(var r=0;r<grid.length;r++) for(var c=0;c<grid[r].length;c++) grid[r][c] = null; char_index = {}; }
+
+  if(words_in.length < 2) throw "A crossword must have at least 2 words";
+  if(words_in.length != clues_in.length) throw "The number of words must equal the number of clues";
+
+  var grid = new Array(GRID_ROWS); for(var i=0;i<GRID_ROWS;i++) grid[i] = new Array(GRID_COLS);
+  var word_elements = [];
+  for(var i=0;i<words_in.length;i++) word_elements.push(new WordElement(words_in[i], i));
+  word_elements.sort(function(a,b){ return b.word.length - a.word.length; });
+}
+
+// ---------- Rendering utilities and interaction ----------
+var rownum = 0, colnum = 0;
+var CrosswordUtils = {
+  toHtml: function(grid, show_answers){ if(!grid) return ''; var html = []; html.push('<table id="crossword1' + '" class="crossword"'); html.push('>'); var label=1; for(var r=0;r<grid.length;r++){ html.push('<tr>'); rownum = r+1; colnum = 0; for(var c=0;c<grid[r].length;c++){ var cell = grid[r][c]; var answer=''; var is_start_of_word=false; var css_class = '';
+      if(cell == null){ css_class = 'no-border'; html.push('<td class="'+css_class+'">&nbsp;</td>'); colnum++; continue; }
+      answer = cell.char;
+      is_start_of_word = (cell.across && cell.across.is_start_of_word) || (cell.down && cell.down.is_start_of_word);
+      html.push('<td class="'+css_class+'">'); if(is_start_of_word){ html.push('<span class="label">'+label+'</span>'); label++; }
+      colnum++; html.push('<div class="tile" data-row="'+rownum+'" data-col="'+colnum+'">'); if(show_answers){ html.push('<div style="font-weight:700;">'+answer+'</div>'); }
+  else{ html.push('<input maxlength="1" data-answer="'+answer+'" data-row="'+rownum+'" data-col="'+colnum+'" onfocus="cellFocus(this)" onkeydown="handleKeyDown(event,this)" onkeyup="keyup(this,false)" />'); }
+      html.push('</div>'); html.push('</td>'); }
+    html.push('</tr>'); }
+    html.push('</table>'); return html.join('\n'); }
+}
+
+// focus & keyboard navigation (adapted from original)
+var dir='across', T=false, R=false, B=false, L=false;
+function cellFocus(elm){ try{ elm.setSelectionRange(0,9999); }catch(e){}; keyup(elm,true); }
+function keyup(elm,focus){ elm.value = elm.value.replace(/\s+/g,'').toUpperCase(); var row = parseInt(elm.getAttribute('data-row')), col = parseInt(elm.getAttribute('data-col'));
+  var table = document.getElementById('crossword1'); T=false;R=false;B=false;L=false; if(!table) return;
+  var maxrows = table.rows.length, maxcols = table.rows[0].cells.length;
+  if(row-2 >= 0 && row-2 < maxrows && col-1 >=0 && col-1 < maxcols) T = table.rows[row-2].cells[col-1].children.length > 0;
+  if(row-1 >=0 && row-1 < maxrows && col >=0 && col < maxcols) R = table.rows[row-1].cells[col].children.length > 0;
+  if(row >=0 && row < maxrows && col-1 >=0 && col-1 < maxcols) B = table.rows[row].cells[col-1].children.length > 0;
+  if(row-1 >=0 && row-1 < maxrows && col-2 >=0 && col-2 < maxcols) L = table.rows[row-1].cells[col-2].children.length > 0;
+  if(focus){ if(B==true && L==false) { dir='down'; document.getElementById('direction').textContent = dir; } if(R==true && T==false){ dir='across'; document.getElementById('direction').textContent = dir; } return; }
+  if(dir=='down'){ try{ table.rows[row].cells[col-1].querySelector('input').focus(); }catch(e){} }
+  if(dir=='across'){ try{ table.rows[row-1].cells[col].querySelector('input').focus(); }catch(e){} }
+}
+
+// handle keyboard navigation: Backspace moves to previous cell when empty,
+// arrow keys move between cells. event: KeyboardEvent, elm: the input
+function handleKeyDown(event, elm){
+  var key = event.key;
+  var row = parseInt(elm.getAttribute('data-row'));
+  var col = parseInt(elm.getAttribute('data-col'));
+  var table = document.getElementById('crossword1');
+  if(!table) return;
+
+  // returns {input, r, c} or null
+  function findNearestInput(r, c, dr, dc){
+    var maxR = table.rows.length;
+    var maxC = table.rows[0].cells.length;
+    var rr = r, cc = c;
+    while(rr >= 1 && rr <= maxR && cc >= 1 && cc <= maxC){
+      try{
+        var cell = table.rows[rr-1].cells[cc-1];
+        if(!cell) break;
+        var input = cell.querySelector('input');
+        if(input) return {input: input, r: rr, c: cc};
+      }catch(e){ break; }
+      rr += dr; cc += dc;
+    }
+    return null;
+  }
+
+  // focus helper using the search (skips no-border cells)
+  function focusNeighbor(r, c, dr, dc){
+    var found = findNearestInput(r, c, dr, dc);
+    if(found){ found.input.focus(); found.input.select(); return true; }
+    return false;
+  }
+
+  if(key === 'Backspace'){
+    event.preventDefault();
+    if(elm.value){
+      // delete current filled cell, then move to previous
+      elm.value = '';
+      // move to previous cell according to direction
+      if(dir === 'across') focusNeighbor(row, col-1, 0, -1);
+      else focusNeighbor(row-1, col, -1, 0);
+    } else {
+      // move to previous cell and clear it (if present)
+      var prev = (dir === 'across') ? findNearestInput(row, col-1, 0, -1) : findNearestInput(row-1, col, -1, 0);
+      if(prev){ prev.input.focus(); prev.input.select(); prev.input.value = ''; }
+    }
+    return;
+  }
+
+  if(key === 'ArrowLeft'){
+    event.preventDefault(); focusNeighbor(row, col-1, 0, -1); return;
+  }
+  if(key === 'ArrowRight'){
+    event.preventDefault(); focusNeighbor(row, col+1, 0, 1); return;
+  }
+  if(key === 'ArrowUp'){
+    event.preventDefault(); focusNeighbor(row-1, col, -1, 0); return;
+  }
+  if(key === 'ArrowDown'){
+    event.preventDefault(); focusNeighbor(row+1, col, 1, 0); return;
+  }
+}
+
+// build and render crossword
+window.addEventListener('load', function(){
+  document.getElementById('crossword').addEventListener('dblclick', function(){ if(L==false && R==false || T==false && B==false) return; dir = (dir=='across')? 'down':'across'; document.getElementById('direction').textContent = dir; });
+
+  var cw = new Crossword(WORDS, CLUES);
+  var tries = 60;
+  var grid = cw.getSquareGrid(tries);
+  if(!grid){ var bad = cw.getBadWords(); alert('Could not create grid. Bad words: '+ bad.map(w=>w.word).join(', ')); return; }
+  document.getElementById('crossword').innerHTML = CrosswordUtils.toHtml(grid, false);
+  var legend = cw.getLegend(grid); addLegendToPage(legend);
+
+  // adjust sizing to be responsive
+  function adjustCellSize(){
+    var table = document.getElementById('crossword1');
+    if(!table) return;
+    var cols = table.rows[0].cells.length;
+    var container = document.getElementById('crosswordPane');
+    var maxWidth = Math.min(container.clientWidth - 24, window.innerWidth - 40);
+    // leave space for clues column on wide screens
+    var cell = Math.floor(maxWidth / cols);
+    var size = Math.max(22, Math.min(60, cell)); // clamp between 22 and 60
+    table.style.setProperty('--cell-size', size + 'px');
+  }
+  adjustCellSize();
+  window.addEventListener('resize', function(){ adjustCellSize(); });
+  // fade out splash after a short delay (3s) once puzzle is rendered
+  setTimeout(function(){
+    var splash = document.getElementById('splash');
+    if(!splash) return;
+    splash.style.transition = 'opacity 400ms ease';
+    splash.style.opacity = '0';
+    setTimeout(()=>{ if(splash && splash.parentNode) splash.parentNode.removeChild(splash); }, 420);
+  }, 3000);
+
+  // attach controls
+  var triesLeft = 3; document.getElementById('triesCount').textContent = triesLeft;
+  document.getElementById('checkBtn').addEventListener('click', function(){ triesLeft--; document.getElementById('triesCount').textContent = triesLeft; if(triesLeft<=0){ document.getElementById('showBtn').disabled = false; document.getElementById('checkBtn').disabled = true; } checkAnswer(); });
+  document.getElementById('showBtn').addEventListener('click', showAnswers);
+  document.getElementById('resetBtn').addEventListener('click', function(){ location.reload(); });
+});
+
+function addLegendToPage(groups){ for(var k in groups){ var html=[]; for(var i=0;i<groups[k].length;i++){ html.push('<li><strong>'+groups[k][i].position+'.</strong> '+groups[k][i].clue+'</li>'); } document.getElementById(k).innerHTML = html.join('\n'); } }
+
+// Wordle-style check
+function checkAnswer(){
+  var inputs = Array.from(document.querySelectorAll('#crossword1 input'));
+  var totalErrors = 0;
+  // stagger animation like Wordle
+  inputs.forEach((inp, idx) => {
+    setTimeout(()=>{ 
+      var expected = (inp.getAttribute('data-answer')||'').toUpperCase();
+      var val = (inp.value||'').toUpperCase();
+      var tile = inp.closest('.tile');
+      if(!tile) return;
+      tile.classList.remove('flip','correct','wrong','present');
+      // trigger reflow for restart
+      void tile.offsetWidth;
+      tile.classList.add('flip');
+      setTimeout(()=>{
+        if(val === expected){ tile.classList.add('correct'); tile.querySelector('input').style.color = '#fff'; }
+        else { tile.classList.add('wrong'); totalErrors++; }
+      }, 220);
+    }, idx * 30);
+  });
+  // after finishing animations, if no errors show success
+  setTimeout(()=>{ if(totalErrors==0){ setTimeout(()=>{ alert('All correct!'); document.querySelectorAll('.tile').forEach(t=>t.classList.add('correct')); }, 300); } }, inputs.length*35 + 300);
+}
+
+function showAnswers(){ var inputs = document.querySelectorAll('#crossword1 input'); inputs.forEach(i=>{ i.value = i.getAttribute('data-answer'); var tile = i.closest('.tile'); tile.classList.remove('wrong'); tile.classList.add('correct'); }); }
+
+</script>
+</body>
+</html>
